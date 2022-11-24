@@ -25,7 +25,7 @@ class RewriteDefer(ast.NodeTransformer):
             else:
                 raise Exception("Unimplemented")
 
-            return ast.copy_location(ast.Expr(value=ast.Call(
+            return ast.Expr(value=ast.Call(
                                     func=ast.Attribute(
                                         value=ast.Name(id=self.exitstack_name, ctx=ast.Load()),
                                         attr='callback',
@@ -33,7 +33,7 @@ class RewriteDefer(ast.NodeTransformer):
                                     ),
                                     args=[post_defer],
                                     keywords=[],
-            )), node)
+            ))
 
 
 def defers(func: Callable) -> Callable:
@@ -46,13 +46,11 @@ def defers(func: Callable) -> Callable:
 
         RewriteDefer(stack_name).visit(tree.body[0])
 
-        tree = ast.fix_missing_locations(tree)
         tree.body[0].body.insert(0, ast.Assign(
             targets=[ast.Name(id=stack_name, ctx=ast.Store())],
             value=ast.Call(func=ast.Name(id='ExitStack', ctx=ast.Load()), args=[], keywords=[])
         ))
 
-        tree = ast.fix_missing_locations(tree)
         tree.body[0].body.append(ast.Expr(
             value=ast.Call(
                 func=ast.Attribute(
@@ -70,13 +68,3 @@ def defers(func: Callable) -> Callable:
         return func(*args, **kwargs)
 
     return wrapped
-
-
-@defers
-def tester():
-    print(1)
-    defer: print(3)
-    print(2)
-
-# tester = defers(tester)
-tester()
