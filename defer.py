@@ -1,8 +1,8 @@
 import ast
 import inspect
 from functools import partial
-from typing import Callable
 from contextlib import ExitStack
+from typing import Callable
 
 
 class RewriteDefer(ast.NodeTransformer):
@@ -50,6 +50,14 @@ def defers(func: Callable) -> Callable:
             targets=[ast.Name(id=stack_name, ctx=ast.Store())],
             value=ast.Call(func=ast.Name(id='ExitStack', ctx=ast.Load()), args=[], keywords=[])
         ))
+        # should probably make both those inserts some other way, later..
+        tree.body[0].body.insert(0, ast.ImportFrom(
+                                        module='defer',
+                                        names=[
+                                            ast.alias(name='ExitStack'),
+                                            ast.alias(name='partial'),
+                                        ],
+                                        level=0))
 
         tree.body[0].body.append(ast.Expr(
             value=ast.Call(
@@ -63,8 +71,7 @@ def defers(func: Callable) -> Callable:
             )
         ))
         tree = ast.fix_missing_locations(tree)
-        exec(compile(tree, '<ast>', 'exec'))
-        func.__code__ = compile(tree, '<preprocessed>', 'exec').co_consts[0]
+        func.__code__ = compile(tree, '<ast>', 'exec').co_consts[0]
         return func(*args, **kwargs)
 
     return wrapped
