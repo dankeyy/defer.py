@@ -17,7 +17,7 @@ f()
 ```
 
 ``` console
-$python test.py
+$ python test.py
 1
 2
 3
@@ -34,21 +34,21 @@ What this does, via some ast manipulation is basically, mostly, this:
 2. Transform that `defer: print(i)` into a callback-able thingy like `partial(print, i)`
 and push it unto the stack, so that we end up with `f_exitstack.callback(partial(print, i))`. \
 This is done by replacing the AnnAssign annotations node with whatever we came up with.
-3. At the end of the function, add a call to `f_exitstack.close() to resolve our defers`.
+3. At the end of the function, add a call to `f_exitstack.close()` to resolve our defers.
 4. ??
 5. profit
 
 ## why
-a: Because & for the nice guy on reddit who suggested it
+a: Because & for the nice guy on reddit who suggested it. Also stop asking me that
 
 ## q: should you use it?
-a: no
+a: No
 
 ## q: why not
-a: because it sucks
+a: Because it sucks
 
 ## q: why does this suck
-a: don't be rude
+a: Don't be rude
 
 ---
 
