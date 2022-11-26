@@ -79,3 +79,21 @@ def defers(func: Callable) -> Callable:
         return func(*args, **kwargs)
 
     return wrapped
+
+
+def defer(func: Callable) -> Callable:
+
+    def wrapped(*args, **kwargs):
+        outer_stack = func._defer_exitstack
+        if outer_stack is None:
+            return func(*args, **kwargs)
+        else:
+            with ExitStack() as stack:
+                func._defer_exitstack = stack
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    func._defer_exitstack = outer_stack
+                    stack.close()
+
+    return wrapped
