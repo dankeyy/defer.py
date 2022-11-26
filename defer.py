@@ -1,9 +1,11 @@
 import ast
 import inspect
 from functools import partial
+from contextlib import contextmanager
 from contextlib import ExitStack
 from typing import Callable
 
+@contextmanager
 
 class RewriteDefer(ast.NodeTransformer):
     def __init__(self, exitstack_name):
@@ -15,43 +17,64 @@ class RewriteDefer(ast.NodeTransformer):
             post_defer = node.annotation
 
             if isinstance(post_defer, ast.Call):
-                # oblivious to function/ method
-                old = post_defer.func
-                new = ast.Name('partial', ast.Load())
-
-                post_defer.func = new
-                post_defer.args.insert(0, old)
-
+                old_defer = post_defer
+                post_defer = ast.Call(
+                    func=ast.Name('partial', ast.Load()),
+                    args=[post_defer.func] + post_defer.args,
+                    keywords=post_defer.keywords,
+                )
             else:
                 raise Exception("Unimplemented")
 
-            return ast.Expr(value=ast.Call(
-                                    func=ast.Attribute(
-                                        value=ast.Name(id=self.exitstack_name, ctx=ast.Load()),
-                                        attr='callback',
-                                        ctx=ast.Load(),
-                                    ),
-                                    args=[post_defer],
-                                    keywords=[],
-            ))
+            new_node = ast.Expr(value=ast.Call(
+                                        func=ast.Attribute(
+                                            value=ast.Name(id=self.exitstack_name, ctx=ast.Load()),
+                                            attr='callback',
+                                            ctx=ast.Load(),
+                                        ),
+                                        args=[post_defer],
+                                        keywords=[],
+            )) 
+            # TODO: this is terrible.
+            if isinstance(node.value, ast.NameConstant):
+                new_node.value.args.append(old_defer)
+            elif isinstance(node.value, ast.Name):
+                new_node.value.args.append(ast.Name(node.value.id, node.value.ctx))
+            elif isinstance(node.value, ast.Call):
+                new_node.value.args.append(ast.Call(
+                    func=node.value.func,
+                    args=node.value.args,
+                    keywords=node.value.keywords,
+                ))
+            else:
+                raise Exception("Unimplemented.")
+            return new_node
 
 
 def defers(func: Callable) -> Callable:
 
     def wrapped(*args, **kwargs):
-        tree = ast.parse(inspect.getsource(func))
-        assert len(tree.body) == 1 and isinstance(tree.body[0], ast.FunctionDef), "should just be a function wtf"
+        try:
+            tree = ast.parse(inspect.getsource(func))
+        except OSError:
+            return func(*args, **kwargs)
+
 
         stack_name = func.__name__ + "_exitstack"
 
         RewriteDefer(stack_name).visit(tree.body[0])
 
-        tree.body[0].body.insert(0, ast.Assign(
+        if len(tree.body) == 1 and isinstance(tree.body[0], ast.FunctionDef):
+            node = tree.body[0]
+        else:
+            node = tree.body[0].value # hopefully this is a return, or just a statement.
+
+        node.body.insert(0, ast.Assign(
             targets=[ast.Name(id=stack_name, ctx=ast.Store())],
             value=ast.Call(func=ast.Name(id='ExitStack', ctx=ast.Load()), args=[], keywords=[])
         ))
         # should probably make both those inserts some other way, later..
-        tree.body[0].body.insert(0, ast.ImportFrom(
+        node.body.insert(0, ast.ImportFrom(
                                         module='defer',
                                         names=[
                                             ast.alias(name='ExitStack'),
@@ -59,7 +82,8 @@ def defers(func: Callable) -> Callable:
                                         ],
                                         level=0))
 
-        tree.body[0].body.append(ast.Expr(
+        ))
+        node.body.append(ast.Expr(
             value=ast.Call(
                 func=ast.Attribute(
                         value=ast.Name(id=stack_name, ctx=ast.Load()),
@@ -71,7 +95,14 @@ def defers(func: Callable) -> Callable:
             )
         ))
         tree = ast.fix_missing_locations(tree)
-        func.__code__ = compile(tree, '<ast>', 'exec').co_consts[0]
+
+        if isinstance(tree.body[0], ast.FunctionDef):
+            func.__code__ = compile(tree, '<ast>', 'exec').co_consts[0]
+        else:
+            # this is a hack, and is probably really really really bad.
+            exec(compile(tree, '<ast>', 'exec'))
+            func = eval(func.__name__)
+
         return func(*args, **kwargs)
 
     return wrapped
