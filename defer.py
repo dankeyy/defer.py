@@ -14,16 +14,15 @@ class RewriteDefer(ast.NodeTransformer):
         if node.target.id == 'defer':
             post_defer = node.annotation
 
-            if isinstance(post_defer, ast.Call):
-                # oblivious to function/ method
-                old = post_defer.func
-                new = ast.Name('partial', ast.Load())
+            if not isinstance(post_defer, ast.Call):
+                raise NotImplementedError()
+                
+            # oblivious to function/ method
+            old = post_defer.func
+            new = ast.Name('partial', ast.Load())
 
-                post_defer.func = new
-                post_defer.args.insert(0, old)
-
-            else:
-                raise Exception("Unimplemented")
+            post_defer.func = new
+            post_defer.args.insert(0, old)
 
             return ast.Expr(value=ast.Call(
                                     func=ast.Attribute(
