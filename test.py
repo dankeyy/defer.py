@@ -5,6 +5,7 @@ from defer import defers
 @defers
 def test_print():
     print(1)
+    defer: lambda: print(4)
     defer: print(3)
     print(2)
 

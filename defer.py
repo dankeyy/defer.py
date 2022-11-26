@@ -21,6 +21,9 @@ class RewriteDefer(ast.NodeTransformer):
 
                 post_defer.func = new
                 post_defer.args.insert(0, old)
+            elif isinstance(post_defer, ast.Lambda):
+                # no action needed, just pass the lambda as is to the callback stack
+                pass
 
             else:
                 raise Exception("Unimplemented")
