@@ -41,8 +41,7 @@ def defers(func: Callable) -> Callable:
     def wrapped(*args, **kwargs):
         try:
             tree = ast.parse(inspect.getsource(func))
-        except:
-            pass
+        except OSError:
             return func(*args, **kwargs)
 
         assert len(tree.body) == 1 and isinstance(tree.body[0], ast.FunctionDef), "should just be a function wtf"
