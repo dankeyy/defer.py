@@ -56,9 +56,14 @@ def defers(func: Callable) -> Callable:
         ))
         # should probably make both those inserts some other way, later..
         tree.body[0].body.insert(0, ast.ImportFrom(
-                                        module='defer',
+                                        module='contextlib',
                                         names=[
                                             ast.alias(name='ExitStack'),
+                                        ],
+                                        level=0))
+        tree.body[0].body.insert(0, ast.ImportFrom(
+                                        module='functools',
+                                        names=[
                                             ast.alias(name='partial'),
                                         ],
                                         level=0))
